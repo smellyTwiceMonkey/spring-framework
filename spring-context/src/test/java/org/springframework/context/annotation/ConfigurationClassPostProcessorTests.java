@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,10 +23,11 @@ import java.lang.annotation.Target;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+
 import javax.annotation.PostConstruct;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.aop.framework.autoproxy.DefaultAdvisorAutoProxyCreator;
 import org.springframework.aop.interceptor.SimpleTraceInterceptor;
@@ -44,6 +45,7 @@ import org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostP
 import org.springframework.beans.factory.annotation.Lookup;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.QualifierAnnotationAutowireCandidateResolver;
+import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.BeanDefinitionHolder;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
@@ -51,6 +53,8 @@ import org.springframework.beans.factory.support.BeanDefinitionRegistryPostProce
 import org.springframework.beans.factory.support.ChildBeanDefinition;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.support.RootBeanDefinition;
+import org.springframework.beans.testfixture.beans.ITestBean;
+import org.springframework.beans.testfixture.beans.TestBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.componentscan.simple.SimpleComponent;
 import org.springframework.core.ResolvableType;
@@ -58,13 +62,15 @@ import org.springframework.core.annotation.Order;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.StandardEnvironment;
 import org.springframework.core.io.DescriptiveResource;
+import org.springframework.core.task.SimpleAsyncTaskExecutor;
+import org.springframework.core.task.SyncTaskExecutor;
 import org.springframework.stereotype.Component;
-import org.springframework.tests.sample.beans.ITestBean;
-import org.springframework.tests.sample.beans.TestBean;
 import org.springframework.util.Assert;
 import org.springframework.util.ObjectUtils;
 
-import static org.junit.Assert.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 /**
  * @author Chris Beams
@@ -76,7 +82,7 @@ public class ConfigurationClassPostProcessorTests {
 	private final DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
 
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		QualifierAnnotationAutowireCandidateResolver acr = new QualifierAnnotationAutowireCandidateResolver();
 		acr.setBeanFactory(this.beanFactory);
@@ -97,11 +103,11 @@ public class ConfigurationClassPostProcessorTests {
 		beanFactory.registerBeanDefinition("config", new RootBeanDefinition(SingletonBeanConfig.class));
 		ConfigurationClassPostProcessor pp = new ConfigurationClassPostProcessor();
 		pp.postProcessBeanFactory(beanFactory);
-		assertTrue(((RootBeanDefinition) beanFactory.getBeanDefinition("config")).hasBeanClass());
+		assertThat(((RootBeanDefinition) beanFactory.getBeanDefinition("config")).hasBeanClass()).isTrue();
 		Foo foo = beanFactory.getBean("foo", Foo.class);
 		Bar bar = beanFactory.getBean("bar", Bar.class);
-		assertSame(foo, bar.foo);
-		assertTrue(Arrays.asList(beanFactory.getDependentBeans("foo")).contains("bar"));
+		assertThat(bar.foo).isSameAs(foo);
+		assertThat(Arrays.asList(beanFactory.getDependentBeans("foo")).contains("bar")).isTrue();
 	}
 
 	@Test
@@ -109,11 +115,11 @@ public class ConfigurationClassPostProcessorTests {
 		beanFactory.registerBeanDefinition("config", new RootBeanDefinition(SingletonBeanConfig.class.getName()));
 		ConfigurationClassPostProcessor pp = new ConfigurationClassPostProcessor();
 		pp.postProcessBeanFactory(beanFactory);
-		assertTrue(((RootBeanDefinition) beanFactory.getBeanDefinition("config")).hasBeanClass());
+		assertThat(((RootBeanDefinition) beanFactory.getBeanDefinition("config")).hasBeanClass()).isTrue();
 		Foo foo = beanFactory.getBean("foo", Foo.class);
 		Bar bar = beanFactory.getBean("bar", Bar.class);
-		assertSame(foo, bar.foo);
-		assertTrue(Arrays.asList(beanFactory.getDependentBeans("foo")).contains("bar"));
+		assertThat(bar.foo).isSameAs(foo);
+		assertThat(Arrays.asList(beanFactory.getDependentBeans("foo")).contains("bar")).isTrue();
 	}
 
 	@Test
@@ -121,10 +127,10 @@ public class ConfigurationClassPostProcessorTests {
 		beanFactory.registerBeanDefinition("config", new RootBeanDefinition(NonEnhancedSingletonBeanConfig.class));
 		ConfigurationClassPostProcessor pp = new ConfigurationClassPostProcessor();
 		pp.postProcessBeanFactory(beanFactory);
-		assertTrue(((RootBeanDefinition) beanFactory.getBeanDefinition("config")).hasBeanClass());
+		assertThat(((RootBeanDefinition) beanFactory.getBeanDefinition("config")).hasBeanClass()).isTrue();
 		Foo foo = beanFactory.getBean("foo", Foo.class);
 		Bar bar = beanFactory.getBean("bar", Bar.class);
-		assertNotSame(foo, bar.foo);
+		assertThat(bar.foo).isNotSameAs(foo);
 	}
 
 	@Test
@@ -132,10 +138,10 @@ public class ConfigurationClassPostProcessorTests {
 		beanFactory.registerBeanDefinition("config", new RootBeanDefinition(NonEnhancedSingletonBeanConfig.class.getName()));
 		ConfigurationClassPostProcessor pp = new ConfigurationClassPostProcessor();
 		pp.postProcessBeanFactory(beanFactory);
-		assertTrue(((RootBeanDefinition) beanFactory.getBeanDefinition("config")).hasBeanClass());
+		assertThat(((RootBeanDefinition) beanFactory.getBeanDefinition("config")).hasBeanClass()).isTrue();
 		Foo foo = beanFactory.getBean("foo", Foo.class);
 		Bar bar = beanFactory.getBean("bar", Bar.class);
-		assertNotSame(foo, bar.foo);
+		assertThat(bar.foo).isNotSameAs(foo);
 	}
 
 	@Test
@@ -143,12 +149,12 @@ public class ConfigurationClassPostProcessorTests {
 		beanFactory.registerBeanDefinition("config", new RootBeanDefinition(StaticSingletonBeanConfig.class));
 		ConfigurationClassPostProcessor pp = new ConfigurationClassPostProcessor();
 		pp.postProcessBeanFactory(beanFactory);
-		assertTrue(((RootBeanDefinition) beanFactory.getBeanDefinition("config")).hasBeanClass());
-		assertTrue(((RootBeanDefinition) beanFactory.getBeanDefinition("foo")).hasBeanClass());
-		assertTrue(((RootBeanDefinition) beanFactory.getBeanDefinition("bar")).hasBeanClass());
+		assertThat(((RootBeanDefinition) beanFactory.getBeanDefinition("config")).hasBeanClass()).isTrue();
+		assertThat(((RootBeanDefinition) beanFactory.getBeanDefinition("foo")).hasBeanClass()).isTrue();
+		assertThat(((RootBeanDefinition) beanFactory.getBeanDefinition("bar")).hasBeanClass()).isTrue();
 		Foo foo = beanFactory.getBean("foo", Foo.class);
 		Bar bar = beanFactory.getBean("bar", Bar.class);
-		assertNotSame(foo, bar.foo);
+		assertThat(bar.foo).isNotSameAs(foo);
 	}
 
 	@Test
@@ -156,12 +162,12 @@ public class ConfigurationClassPostProcessorTests {
 		beanFactory.registerBeanDefinition("config", new RootBeanDefinition(StaticSingletonBeanConfig.class.getName()));
 		ConfigurationClassPostProcessor pp = new ConfigurationClassPostProcessor();
 		pp.postProcessBeanFactory(beanFactory);
-		assertTrue(((RootBeanDefinition) beanFactory.getBeanDefinition("config")).hasBeanClass());
-		assertTrue(((RootBeanDefinition) beanFactory.getBeanDefinition("foo")).hasBeanClass());
-		assertTrue(((RootBeanDefinition) beanFactory.getBeanDefinition("bar")).hasBeanClass());
+		assertThat(((RootBeanDefinition) beanFactory.getBeanDefinition("config")).hasBeanClass()).isTrue();
+		assertThat(((RootBeanDefinition) beanFactory.getBeanDefinition("foo")).hasBeanClass()).isTrue();
+		assertThat(((RootBeanDefinition) beanFactory.getBeanDefinition("bar")).hasBeanClass()).isTrue();
 		Foo foo = beanFactory.getBean("foo", Foo.class);
 		Bar bar = beanFactory.getBean("bar", Bar.class);
-		assertNotSame(foo, bar.foo);
+		assertThat(bar.foo).isNotSameAs(foo);
 	}
 
 	@Test
@@ -171,7 +177,7 @@ public class ConfigurationClassPostProcessorTests {
 		pp.postProcessBeanFactory(beanFactory);
 		Foo foo = beanFactory.getBean("foo", Foo.class);
 		Bar bar = beanFactory.getBean("bar", Bar.class);
-		assertSame(foo, bar.foo);
+		assertThat(bar.foo).isSameAs(foo);
 	}
 
 	/**
@@ -200,7 +206,7 @@ public class ConfigurationClassPostProcessorTests {
 		pp.postProcessBeanFactory(beanFactory);
 		Foo foo = beanFactory.getBean("foo", Foo.class);
 		Bar bar = beanFactory.getBean("bar", Bar.class);
-		assertSame(foo, bar.foo);
+		assertThat(bar.foo).isSameAs(foo);
 	}
 
 	@Test
@@ -305,7 +311,7 @@ public class ConfigurationClassPostProcessorTests {
 		pp.setEnvironment(new StandardEnvironment());
 		pp.postProcessBeanFactory(beanFactory);
 		SimpleComponent simpleComponent = beanFactory.getBean(SimpleComponent.class);
-		assertNotNull(simpleComponent);
+		assertThat(simpleComponent).isNotNull();
 	}
 
 	private void assertSupportForComposedAnnotationWithExclude(RootBeanDefinition beanDefinition) {
@@ -313,13 +319,8 @@ public class ConfigurationClassPostProcessorTests {
 		ConfigurationClassPostProcessor pp = new ConfigurationClassPostProcessor();
 		pp.setEnvironment(new StandardEnvironment());
 		pp.postProcessBeanFactory(beanFactory);
-		try {
-			beanFactory.getBean(SimpleComponent.class);
-			fail("Should have thrown NoSuchBeanDefinitionException");
-		}
-		catch (NoSuchBeanDefinitionException ex) {
-			// expected
-		}
+		assertThatExceptionOfType(NoSuchBeanDefinitionException.class).isThrownBy(() ->
+				beanFactory.getBean(SimpleComponent.class));
 	}
 
 	@Test
@@ -332,7 +333,7 @@ public class ConfigurationClassPostProcessorTests {
 		pp.postProcessBeanFactory(beanFactory);
 		Foo foo = beanFactory.getBean("foo", Foo.class);
 		Bar bar = beanFactory.getBean("bar", Bar.class);
-		assertSame(foo, bar.foo);
+		assertThat(bar.foo).isSameAs(foo);
 	}
 
 	@Test
@@ -369,15 +370,23 @@ public class ConfigurationClassPostProcessorTests {
 		beanFactory.registerBeanDefinition("config", new RootBeanDefinition(SingletonBeanConfig.class));
 		beanFactory.setAllowBeanDefinitionOverriding(false);
 		ConfigurationClassPostProcessor pp = new ConfigurationClassPostProcessor();
-		try {
-			pp.postProcessBeanFactory(beanFactory);
-			fail("Should have thrown BeanDefinitionStoreException");
-		}
-		catch (BeanDefinitionStoreException ex) {
-			assertTrue(ex.getMessage().contains("bar"));
-			assertTrue(ex.getMessage().contains("SingletonBeanConfig"));
-			assertTrue(ex.getMessage().contains(TestBean.class.getName()));
-		}
+		assertThatExceptionOfType(BeanDefinitionStoreException.class).isThrownBy(() ->
+				pp.postProcessBeanFactory(beanFactory))
+			.withMessageContaining("bar")
+			.withMessageContaining("SingletonBeanConfig")
+			.withMessageContaining(TestBean.class.getName());
+	}
+
+	@Test  // gh-25430
+	public void detectAliasOverride() {
+		AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+		DefaultListableBeanFactory beanFactory = context.getDefaultListableBeanFactory();
+		beanFactory.setAllowBeanDefinitionOverriding(false);
+		context.register(FirstConfiguration.class, SecondConfiguration.class);
+		assertThatIllegalStateException().isThrownBy(context::refresh)
+				.withMessageContaining("alias 'taskExecutor'")
+				.withMessageContaining("name 'applicationTaskExecutor'")
+				.withMessageContaining("bean definition 'taskExecutor'");
 	}
 
 	@Test
@@ -388,9 +397,10 @@ public class ConfigurationClassPostProcessorTests {
 		pp.postProcessBeanFactory(beanFactory);
 
 		Foo foo = beanFactory.getBean(Foo.class);
-		assertTrue(foo instanceof ExtendedFoo);
+		boolean condition = foo instanceof ExtendedFoo;
+		assertThat(condition).isTrue();
 		Bar bar = beanFactory.getBean(Bar.class);
-		assertSame(foo, bar.foo);
+		assertThat(bar.foo).isSameAs(foo);
 	}
 
 	@Test
@@ -402,9 +412,10 @@ public class ConfigurationClassPostProcessorTests {
 		pp.postProcessBeanFactory(beanFactory);
 
 		Foo foo = beanFactory.getBean(Foo.class);
-		assertTrue(foo instanceof ExtendedAgainFoo);
+		boolean condition = foo instanceof ExtendedAgainFoo;
+		assertThat(condition).isTrue();
 		Bar bar = beanFactory.getBean(Bar.class);
-		assertSame(foo, bar.foo);
+		assertThat(bar.foo).isSameAs(foo);
 	}
 
 	@Test
@@ -415,16 +426,12 @@ public class ConfigurationClassPostProcessorTests {
 		ConfigurationClassPostProcessor pp = new ConfigurationClassPostProcessor();
 		pp.postProcessBeanFactory(beanFactory);
 
-		try {
-			beanFactory.getBean(Bar.class);
-			fail("Should have thrown BeanCreationException");
-		}
-		catch (BeanCreationException ex) {
-			assertTrue(ex.getMessage().contains("OverridingSingletonBeanConfig.foo"));
-			assertTrue(ex.getMessage().contains(ExtendedFoo.class.getName()));
-			assertTrue(ex.getMessage().contains(Foo.class.getName()));
-			assertTrue(ex.getMessage().contains("InvalidOverridingSingletonBeanConfig"));
-		}
+		assertThatExceptionOfType(BeanCreationException.class).isThrownBy(() ->
+				beanFactory.getBean(Bar.class))
+			.withMessageContaining("OverridingSingletonBeanConfig.foo")
+			.withMessageContaining(ExtendedFoo.class.getName())
+			.withMessageContaining(Foo.class.getName())
+			.withMessageContaining("InvalidOverridingSingletonBeanConfig");
 	}
 
 	@Test  // SPR-15384
@@ -434,9 +441,10 @@ public class ConfigurationClassPostProcessorTests {
 		pp.postProcessBeanFactory(beanFactory);
 
 		Foo foo = beanFactory.getBean(Foo.class);
-		assertTrue(foo instanceof ExtendedFoo);
+		boolean condition = foo instanceof ExtendedFoo;
+		assertThat(condition).isTrue();
 		Bar bar = beanFactory.getBean(Bar.class);
-		assertSame(foo, bar.foo);
+		assertThat(bar.foo).isSameAs(foo);
 	}
 
 	@Test  // SPR-16734
@@ -447,9 +455,10 @@ public class ConfigurationClassPostProcessorTests {
 		beanFactory.addBeanPostProcessor(new AutowiredAnnotationBeanPostProcessor());
 
 		Foo foo = beanFactory.getBean(Foo.class);
-		assertTrue(foo instanceof ExtendedFoo);
+		boolean condition = foo instanceof ExtendedFoo;
+		assertThat(condition).isTrue();
 		Bar bar = beanFactory.getBean(Bar.class);
-		assertSame(foo, bar.foo);
+		assertThat(bar.foo).isSameAs(foo);
 	}
 
 	@Test
@@ -463,9 +472,10 @@ public class ConfigurationClassPostProcessorTests {
 		pp.postProcessBeanFactory(beanFactory);
 
 		ITestBean injected = beanFactory.getBean("consumer", ScopedProxyConsumer.class).testBean;
-		assertTrue(injected instanceof ScopedObject);
-		assertSame(beanFactory.getBean("scopedClass"), injected);
-		assertSame(beanFactory.getBean(ITestBean.class), injected);
+		boolean condition = injected instanceof ScopedObject;
+		assertThat(condition).isTrue();
+		assertThat(injected).isSameAs(beanFactory.getBean("scopedClass"));
+		assertThat(injected).isSameAs(beanFactory.getBean(ITestBean.class));
 	}
 
 	@Test
@@ -474,19 +484,11 @@ public class ConfigurationClassPostProcessorTests {
 		DefaultListableBeanFactory bf2 = new DefaultListableBeanFactory();
 		ConfigurationClassPostProcessor pp = new ConfigurationClassPostProcessor();
 		pp.postProcessBeanFactory(bf1); // first invocation -- should succeed
-		try {
-			pp.postProcessBeanFactory(bf1); // second invocation for bf1 -- should throw
-			fail("expected exception");
-		}
-		catch (IllegalStateException ex) {
-		}
+		assertThatIllegalStateException().isThrownBy(() ->
+				pp.postProcessBeanFactory(bf1)); // second invocation for bf1 -- should throw
 		pp.postProcessBeanFactory(bf2); // first invocation for bf2 -- should succeed
-		try {
-			pp.postProcessBeanFactory(bf2); // second invocation for bf2 -- should throw
-			fail("expected exception");
-		}
-		catch (IllegalStateException ex) {
-		}
+		assertThatIllegalStateException().isThrownBy(() ->
+				pp.postProcessBeanFactory(bf2)); // second invocation for bf2 -- should throw
 	}
 
 	@Test
@@ -495,15 +497,15 @@ public class ConfigurationClassPostProcessorTests {
 		bpp.setBeanFactory(beanFactory);
 		beanFactory.addBeanPostProcessor(bpp);
 		RootBeanDefinition bd = new RootBeanDefinition(RepositoryInjectionBean.class);
-		bd.setScope(RootBeanDefinition.SCOPE_PROTOTYPE);
+		bd.setScope(BeanDefinition.SCOPE_PROTOTYPE);
 		beanFactory.registerBeanDefinition("annotatedBean", bd);
 		beanFactory.registerBeanDefinition("configClass", new RootBeanDefinition(RepositoryConfiguration.class));
 		ConfigurationClassPostProcessor pp = new ConfigurationClassPostProcessor();
 		pp.postProcessBeanFactory(beanFactory);
 
 		RepositoryInjectionBean bean = (RepositoryInjectionBean) beanFactory.getBean("annotatedBean");
-		assertEquals("Repository<String>", bean.stringRepository.toString());
-		assertEquals("Repository<Integer>", bean.integerRepository.toString());
+		assertThat(bean.stringRepository.toString()).isEqualTo("Repository<String>");
+		assertThat(bean.integerRepository.toString()).isEqualTo("Repository<Integer>");
 	}
 
 	@Test
@@ -512,15 +514,15 @@ public class ConfigurationClassPostProcessorTests {
 		bpp.setBeanFactory(beanFactory);
 		beanFactory.addBeanPostProcessor(bpp);
 		RootBeanDefinition bd = new RootBeanDefinition(RepositoryInjectionBean.class);
-		bd.setScope(RootBeanDefinition.SCOPE_PROTOTYPE);
+		bd.setScope(BeanDefinition.SCOPE_PROTOTYPE);
 		beanFactory.registerBeanDefinition("annotatedBean", bd);
 		beanFactory.registerBeanDefinition("configClass", new RootBeanDefinition(ScopedRepositoryConfiguration.class));
 		ConfigurationClassPostProcessor pp = new ConfigurationClassPostProcessor();
 		pp.postProcessBeanFactory(beanFactory);
 
 		RepositoryInjectionBean bean = (RepositoryInjectionBean) beanFactory.getBean("annotatedBean");
-		assertEquals("Repository<String>", bean.stringRepository.toString());
-		assertEquals("Repository<Integer>", bean.integerRepository.toString());
+		assertThat(bean.stringRepository.toString()).isEqualTo("Repository<String>");
+		assertThat(bean.integerRepository.toString()).isEqualTo("Repository<Integer>");
 	}
 
 	@Test
@@ -529,7 +531,7 @@ public class ConfigurationClassPostProcessorTests {
 		bpp.setBeanFactory(beanFactory);
 		beanFactory.addBeanPostProcessor(bpp);
 		RootBeanDefinition bd = new RootBeanDefinition(RepositoryInjectionBean.class);
-		bd.setScope(RootBeanDefinition.SCOPE_PROTOTYPE);
+		bd.setScope(BeanDefinition.SCOPE_PROTOTYPE);
 		beanFactory.registerBeanDefinition("annotatedBean", bd);
 		beanFactory.registerBeanDefinition("configClass", new RootBeanDefinition(ScopedProxyRepositoryConfiguration.class));
 		ConfigurationClassPostProcessor pp = new ConfigurationClassPostProcessor();
@@ -537,10 +539,10 @@ public class ConfigurationClassPostProcessorTests {
 		beanFactory.freezeConfiguration();
 
 		RepositoryInjectionBean bean = (RepositoryInjectionBean) beanFactory.getBean("annotatedBean");
-		assertEquals("Repository<String>", bean.stringRepository.toString());
-		assertEquals("Repository<Integer>", bean.integerRepository.toString());
-		assertTrue(AopUtils.isCglibProxy(bean.stringRepository));
-		assertTrue(AopUtils.isCglibProxy(bean.integerRepository));
+		assertThat(bean.stringRepository.toString()).isEqualTo("Repository<String>");
+		assertThat(bean.integerRepository.toString()).isEqualTo("Repository<Integer>");
+		assertThat(AopUtils.isCglibProxy(bean.stringRepository)).isTrue();
+		assertThat(AopUtils.isCglibProxy(bean.integerRepository)).isTrue();
 	}
 
 	@Test
@@ -549,7 +551,7 @@ public class ConfigurationClassPostProcessorTests {
 		bpp.setBeanFactory(beanFactory);
 		beanFactory.addBeanPostProcessor(bpp);
 		RootBeanDefinition bd = new RootBeanDefinition(RepositoryInjectionBean.class.getName());
-		bd.setScope(RootBeanDefinition.SCOPE_PROTOTYPE);
+		bd.setScope(BeanDefinition.SCOPE_PROTOTYPE);
 		beanFactory.registerBeanDefinition("annotatedBean", bd);
 		beanFactory.registerBeanDefinition("configClass", new RootBeanDefinition(ScopedProxyRepositoryConfiguration.class.getName()));
 		ConfigurationClassPostProcessor pp = new ConfigurationClassPostProcessor();
@@ -557,10 +559,10 @@ public class ConfigurationClassPostProcessorTests {
 		beanFactory.freezeConfiguration();
 
 		RepositoryInjectionBean bean = (RepositoryInjectionBean) beanFactory.getBean("annotatedBean");
-		assertEquals("Repository<String>", bean.stringRepository.toString());
-		assertEquals("Repository<Integer>", bean.integerRepository.toString());
-		assertTrue(AopUtils.isCglibProxy(bean.stringRepository));
-		assertTrue(AopUtils.isCglibProxy(bean.integerRepository));
+		assertThat(bean.stringRepository.toString()).isEqualTo("Repository<String>");
+		assertThat(bean.integerRepository.toString()).isEqualTo("Repository<Integer>");
+		assertThat(AopUtils.isCglibProxy(bean.stringRepository)).isTrue();
+		assertThat(AopUtils.isCglibProxy(bean.integerRepository)).isTrue();
 	}
 
 	@Test
@@ -569,7 +571,7 @@ public class ConfigurationClassPostProcessorTests {
 		bpp.setBeanFactory(beanFactory);
 		beanFactory.addBeanPostProcessor(bpp);
 		RootBeanDefinition bd = new RootBeanDefinition(SpecificRepositoryInjectionBean.class);
-		bd.setScope(RootBeanDefinition.SCOPE_PROTOTYPE);
+		bd.setScope(BeanDefinition.SCOPE_PROTOTYPE);
 		beanFactory.registerBeanDefinition("annotatedBean", bd);
 		beanFactory.registerBeanDefinition("configClass", new RootBeanDefinition(SpecificRepositoryConfiguration.class));
 		ConfigurationClassPostProcessor pp = new ConfigurationClassPostProcessor();
@@ -577,7 +579,7 @@ public class ConfigurationClassPostProcessorTests {
 		beanFactory.preInstantiateSingletons();
 
 		SpecificRepositoryInjectionBean bean = (SpecificRepositoryInjectionBean) beanFactory.getBean("annotatedBean");
-		assertSame(beanFactory.getBean("genericRepo"), bean.genericRepository);
+		assertThat(bean.genericRepository).isSameAs(beanFactory.getBean("genericRepo"));
 	}
 
 	@Test
@@ -586,7 +588,7 @@ public class ConfigurationClassPostProcessorTests {
 		bpp.setBeanFactory(beanFactory);
 		beanFactory.addBeanPostProcessor(bpp);
 		RootBeanDefinition bd = new RootBeanDefinition(RepositoryFactoryBeanInjectionBean.class);
-		bd.setScope(RootBeanDefinition.SCOPE_PROTOTYPE);
+		bd.setScope(BeanDefinition.SCOPE_PROTOTYPE);
 		beanFactory.registerBeanDefinition("annotatedBean", bd);
 		beanFactory.registerBeanDefinition("configClass", new RootBeanDefinition(RepositoryFactoryBeanConfiguration.class));
 		ConfigurationClassPostProcessor pp = new ConfigurationClassPostProcessor();
@@ -594,9 +596,9 @@ public class ConfigurationClassPostProcessorTests {
 		beanFactory.preInstantiateSingletons();
 
 		RepositoryFactoryBeanInjectionBean bean = (RepositoryFactoryBeanInjectionBean) beanFactory.getBean("annotatedBean");
-		assertSame(beanFactory.getBean("&repoFactoryBean"), bean.repositoryFactoryBean);
-		assertSame(beanFactory.getBean("&repoFactoryBean"), bean.qualifiedRepositoryFactoryBean);
-		assertSame(beanFactory.getBean("&repoFactoryBean"), bean.prefixQualifiedRepositoryFactoryBean);
+		assertThat(bean.repositoryFactoryBean).isSameAs(beanFactory.getBean("&repoFactoryBean"));
+		assertThat(bean.qualifiedRepositoryFactoryBean).isSameAs(beanFactory.getBean("&repoFactoryBean"));
+		assertThat(bean.prefixQualifiedRepositoryFactoryBean).isSameAs(beanFactory.getBean("&repoFactoryBean"));
 	}
 
 	@Test
@@ -605,7 +607,7 @@ public class ConfigurationClassPostProcessorTests {
 		ConfigurationClassPostProcessor pp = new ConfigurationClassPostProcessor();
 		pp.postProcessBeanFactory(beanFactory);
 
-		assertSame(beanFactory.getBean("rawRepo"), beanFactory.getBean("repoConsumer"));
+		assertThat(beanFactory.getBean("repoConsumer")).isSameAs(beanFactory.getBean("rawRepo"));
 	}
 
 	@Test
@@ -614,7 +616,7 @@ public class ConfigurationClassPostProcessorTests {
 		ConfigurationClassPostProcessor pp = new ConfigurationClassPostProcessor();
 		pp.postProcessBeanFactory(beanFactory);
 
-		assertSame(beanFactory.getBean("genericRepo"), beanFactory.getBean("repoConsumer"));
+		assertThat(beanFactory.getBean("repoConsumer")).isSameAs(beanFactory.getBean("genericRepo"));
 	}
 
 	@Test
@@ -622,7 +624,7 @@ public class ConfigurationClassPostProcessorTests {
 		beanFactory.registerBeanDefinition("configClass", new RootBeanDefinition(WildcardWithExtendsConfiguration.class));
 		new ConfigurationClassPostProcessor().postProcessBeanFactory(beanFactory);
 
-		assertSame(beanFactory.getBean("stringRepo"), beanFactory.getBean("repoConsumer"));
+		assertThat(beanFactory.getBean("repoConsumer")).isSameAs(beanFactory.getBean("stringRepo"));
 	}
 
 	@Test
@@ -630,7 +632,7 @@ public class ConfigurationClassPostProcessorTests {
 		beanFactory.registerBeanDefinition("configClass", new RootBeanDefinition(WildcardWithGenericExtendsConfiguration.class));
 		new ConfigurationClassPostProcessor().postProcessBeanFactory(beanFactory);
 
-		assertSame(beanFactory.getBean("genericRepo"), beanFactory.getBean("repoConsumer"));
+		assertThat(beanFactory.getBean("repoConsumer")).isSameAs(beanFactory.getBean("genericRepo"));
 	}
 
 	@Test
@@ -639,15 +641,15 @@ public class ConfigurationClassPostProcessorTests {
 		new ConfigurationClassPostProcessor().postProcessBeanFactory(beanFactory);
 
 		String[] beanNames = beanFactory.getBeanNamesForType(Repository.class);
-		assertTrue(ObjectUtils.containsElement(beanNames, "stringRepo"));
+		assertThat(ObjectUtils.containsElement(beanNames, "stringRepo")).isTrue();
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(Repository.class, String.class));
-		assertEquals(1, beanNames.length);
-		assertEquals("stringRepo", beanNames[0]);
+		assertThat(beanNames.length).isEqualTo(1);
+		assertThat(beanNames[0]).isEqualTo("stringRepo");
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(Repository.class, String.class));
-		assertEquals(1, beanNames.length);
-		assertEquals("stringRepo", beanNames[0]);
+		assertThat(beanNames.length).isEqualTo(1);
+		assertThat(beanNames[0]).isEqualTo("stringRepo");
 	}
 
 	@Test
@@ -657,15 +659,15 @@ public class ConfigurationClassPostProcessorTests {
 		beanFactory.preInstantiateSingletons();
 
 		String[] beanNames = beanFactory.getBeanNamesForType(Repository.class);
-		assertTrue(ObjectUtils.containsElement(beanNames, "stringRepo"));
+		assertThat(ObjectUtils.containsElement(beanNames, "stringRepo")).isTrue();
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(Repository.class, String.class));
-		assertEquals(1, beanNames.length);
-		assertEquals("stringRepo", beanNames[0]);
+		assertThat(beanNames.length).isEqualTo(1);
+		assertThat(beanNames[0]).isEqualTo("stringRepo");
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(Repository.class, String.class));
-		assertEquals(1, beanNames.length);
-		assertEquals("stringRepo", beanNames[0]);
+		assertThat(beanNames.length).isEqualTo(1);
+		assertThat(beanNames[0]).isEqualTo("stringRepo");
 	}
 
 	@Test
@@ -674,13 +676,13 @@ public class ConfigurationClassPostProcessorTests {
 		new ConfigurationClassPostProcessor().postProcessBeanFactory(beanFactory);
 
 		String[] beanNames = beanFactory.getBeanNamesForType(Repository.class);
-		assertTrue(ObjectUtils.containsElement(beanNames, "stringRepo"));
+		assertThat(ObjectUtils.containsElement(beanNames, "stringRepo")).isTrue();
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(Repository.class, String.class));
-		assertEquals(0, beanNames.length);
+		assertThat(beanNames.length).isEqualTo(0);
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(Repository.class, String.class));
-		assertEquals(0, beanNames.length);
+		assertThat(beanNames.length).isEqualTo(0);
 	}
 
 	@Test
@@ -690,15 +692,15 @@ public class ConfigurationClassPostProcessorTests {
 		beanFactory.preInstantiateSingletons();
 
 		String[] beanNames = beanFactory.getBeanNamesForType(Repository.class);
-		assertTrue(ObjectUtils.containsElement(beanNames, "stringRepo"));
+		assertThat(ObjectUtils.containsElement(beanNames, "stringRepo")).isTrue();
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(Repository.class, String.class));
-		assertEquals(1, beanNames.length);
-		assertEquals("stringRepo", beanNames[0]);
+		assertThat(beanNames.length).isEqualTo(1);
+		assertThat(beanNames[0]).isEqualTo("stringRepo");
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(Repository.class, String.class));
-		assertEquals(1, beanNames.length);
-		assertEquals("stringRepo", beanNames[0]);
+		assertThat(beanNames.length).isEqualTo(1);
+		assertThat(beanNames[0]).isEqualTo("stringRepo");
 	}
 
 	@Test
@@ -707,15 +709,15 @@ public class ConfigurationClassPostProcessorTests {
 		new ConfigurationClassPostProcessor().postProcessBeanFactory(beanFactory);
 
 		String[] beanNames = beanFactory.getBeanNamesForType(Repository.class);
-		assertTrue(ObjectUtils.containsElement(beanNames, "stringRepo"));
+		assertThat(ObjectUtils.containsElement(beanNames, "stringRepo")).isTrue();
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(Repository.class, String.class));
-		assertEquals(1, beanNames.length);
-		assertEquals("stringRepo", beanNames[0]);
+		assertThat(beanNames.length).isEqualTo(1);
+		assertThat(beanNames[0]).isEqualTo("stringRepo");
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(Repository.class, String.class));
-		assertEquals(1, beanNames.length);
-		assertEquals("stringRepo", beanNames[0]);
+		assertThat(beanNames.length).isEqualTo(1);
+		assertThat(beanNames[0]).isEqualTo("stringRepo");
 	}
 
 	@Test
@@ -725,15 +727,15 @@ public class ConfigurationClassPostProcessorTests {
 		beanFactory.preInstantiateSingletons();
 
 		String[] beanNames = beanFactory.getBeanNamesForType(Repository.class);
-		assertTrue(ObjectUtils.containsElement(beanNames, "stringRepo"));
+		assertThat(ObjectUtils.containsElement(beanNames, "stringRepo")).isTrue();
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(Repository.class, String.class));
-		assertEquals(1, beanNames.length);
-		assertEquals("stringRepo", beanNames[0]);
+		assertThat(beanNames.length).isEqualTo(1);
+		assertThat(beanNames[0]).isEqualTo("stringRepo");
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(Repository.class, String.class));
-		assertEquals(1, beanNames.length);
-		assertEquals("stringRepo", beanNames[0]);
+		assertThat(beanNames.length).isEqualTo(1);
+		assertThat(beanNames[0]).isEqualTo("stringRepo");
 	}
 
 	@Test
@@ -747,17 +749,17 @@ public class ConfigurationClassPostProcessorTests {
 		beanFactory.registerSingleton("traceInterceptor", new DefaultPointcutAdvisor(new SimpleTraceInterceptor()));
 
 		String[] beanNames = beanFactory.getBeanNamesForType(Repository.class);
-		assertTrue(ObjectUtils.containsElement(beanNames, "stringRepo"));
+		assertThat(ObjectUtils.containsElement(beanNames, "stringRepo")).isTrue();
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(Repository.class, String.class));
-		assertEquals(1, beanNames.length);
-		assertEquals("stringRepo", beanNames[0]);
+		assertThat(beanNames.length).isEqualTo(1);
+		assertThat(beanNames[0]).isEqualTo("stringRepo");
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(Repository.class, String.class));
-		assertEquals(1, beanNames.length);
-		assertEquals("stringRepo", beanNames[0]);
+		assertThat(beanNames.length).isEqualTo(1);
+		assertThat(beanNames[0]).isEqualTo("stringRepo");
 
-		assertTrue(AopUtils.isCglibProxy(beanFactory.getBean("stringRepo")));
+		assertThat(AopUtils.isCglibProxy(beanFactory.getBean("stringRepo"))).isTrue();
 	}
 
 	@Test
@@ -772,17 +774,17 @@ public class ConfigurationClassPostProcessorTests {
 		beanFactory.preInstantiateSingletons();
 
 		String[] beanNames = beanFactory.getBeanNamesForType(Repository.class);
-		assertTrue(ObjectUtils.containsElement(beanNames, "stringRepo"));
+		assertThat(ObjectUtils.containsElement(beanNames, "stringRepo")).isTrue();
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(Repository.class, String.class));
-		assertEquals(1, beanNames.length);
-		assertEquals("stringRepo", beanNames[0]);
+		assertThat(beanNames.length).isEqualTo(1);
+		assertThat(beanNames[0]).isEqualTo("stringRepo");
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(Repository.class, String.class));
-		assertEquals(1, beanNames.length);
-		assertEquals("stringRepo", beanNames[0]);
+		assertThat(beanNames.length).isEqualTo(1);
+		assertThat(beanNames[0]).isEqualTo("stringRepo");
 
-		assertTrue(AopUtils.isCglibProxy(beanFactory.getBean("stringRepo")));
+		assertThat(AopUtils.isCglibProxy(beanFactory.getBean("stringRepo"))).isTrue();
 	}
 
 	@Test
@@ -797,17 +799,17 @@ public class ConfigurationClassPostProcessorTests {
 		beanFactory.preInstantiateSingletons();
 
 		String[] beanNames = beanFactory.getBeanNamesForType(Repository.class);
-		assertTrue(ObjectUtils.containsElement(beanNames, "stringRepo"));
+		assertThat(ObjectUtils.containsElement(beanNames, "stringRepo")).isTrue();
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(Repository.class, String.class));
-		assertEquals(1, beanNames.length);
-		assertEquals("stringRepo", beanNames[0]);
+		assertThat(beanNames.length).isEqualTo(1);
+		assertThat(beanNames[0]).isEqualTo("stringRepo");
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(Repository.class, String.class));
-		assertEquals(1, beanNames.length);
-		assertEquals("stringRepo", beanNames[0]);
+		assertThat(beanNames.length).isEqualTo(1);
+		assertThat(beanNames[0]).isEqualTo("stringRepo");
 
-		assertTrue(AopUtils.isCglibProxy(beanFactory.getBean("stringRepo")));
+		assertThat(AopUtils.isCglibProxy(beanFactory.getBean("stringRepo"))).isTrue();
 	}
 
 	@Test
@@ -822,17 +824,17 @@ public class ConfigurationClassPostProcessorTests {
 		beanFactory.preInstantiateSingletons();
 
 		String[] beanNames = beanFactory.getBeanNamesForType(Repository.class);
-		assertTrue(ObjectUtils.containsElement(beanNames, "stringRepo"));
+		assertThat(ObjectUtils.containsElement(beanNames, "stringRepo")).isTrue();
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(Repository.class, String.class));
-		assertEquals(1, beanNames.length);
-		assertEquals("stringRepo", beanNames[0]);
+		assertThat(beanNames.length).isEqualTo(1);
+		assertThat(beanNames[0]).isEqualTo("stringRepo");
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(Repository.class, String.class));
-		assertEquals(1, beanNames.length);
-		assertEquals("stringRepo", beanNames[0]);
+		assertThat(beanNames.length).isEqualTo(1);
+		assertThat(beanNames[0]).isEqualTo("stringRepo");
 
-		assertTrue(AopUtils.isCglibProxy(beanFactory.getBean("stringRepo")));
+		assertThat(AopUtils.isCglibProxy(beanFactory.getBean("stringRepo"))).isTrue();
 	}
 
 	@Test
@@ -845,17 +847,17 @@ public class ConfigurationClassPostProcessorTests {
 		beanFactory.registerSingleton("traceInterceptor", new DefaultPointcutAdvisor(new SimpleTraceInterceptor()));
 
 		String[] beanNames = beanFactory.getBeanNamesForType(RepositoryInterface.class);
-		assertTrue(ObjectUtils.containsElement(beanNames, "stringRepo"));
+		assertThat(ObjectUtils.containsElement(beanNames, "stringRepo")).isTrue();
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(RepositoryInterface.class, String.class));
-		assertEquals(1, beanNames.length);
-		assertEquals("stringRepo", beanNames[0]);
+		assertThat(beanNames.length).isEqualTo(1);
+		assertThat(beanNames[0]).isEqualTo("stringRepo");
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(RepositoryInterface.class, String.class));
-		assertEquals(1, beanNames.length);
-		assertEquals("stringRepo", beanNames[0]);
+		assertThat(beanNames.length).isEqualTo(1);
+		assertThat(beanNames[0]).isEqualTo("stringRepo");
 
-		assertTrue(AopUtils.isJdkDynamicProxy(beanFactory.getBean("stringRepo")));
+		assertThat(AopUtils.isJdkDynamicProxy(beanFactory.getBean("stringRepo"))).isTrue();
 	}
 
 	@Test
@@ -869,17 +871,17 @@ public class ConfigurationClassPostProcessorTests {
 		beanFactory.preInstantiateSingletons();
 
 		String[] beanNames = beanFactory.getBeanNamesForType(RepositoryInterface.class);
-		assertTrue(ObjectUtils.containsElement(beanNames, "stringRepo"));
+		assertThat(ObjectUtils.containsElement(beanNames, "stringRepo")).isTrue();
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(RepositoryInterface.class, String.class));
-		assertEquals(1, beanNames.length);
-		assertEquals("stringRepo", beanNames[0]);
+		assertThat(beanNames.length).isEqualTo(1);
+		assertThat(beanNames[0]).isEqualTo("stringRepo");
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(RepositoryInterface.class, String.class));
-		assertEquals(1, beanNames.length);
-		assertEquals("stringRepo", beanNames[0]);
+		assertThat(beanNames.length).isEqualTo(1);
+		assertThat(beanNames[0]).isEqualTo("stringRepo");
 
-		assertTrue(AopUtils.isJdkDynamicProxy(beanFactory.getBean("stringRepo")));
+		assertThat(AopUtils.isJdkDynamicProxy(beanFactory.getBean("stringRepo"))).isTrue();
 	}
 
 	@Test
@@ -893,17 +895,17 @@ public class ConfigurationClassPostProcessorTests {
 		beanFactory.preInstantiateSingletons();
 
 		String[] beanNames = beanFactory.getBeanNamesForType(RepositoryInterface.class);
-		assertTrue(ObjectUtils.containsElement(beanNames, "stringRepo"));
+		assertThat(ObjectUtils.containsElement(beanNames, "stringRepo")).isTrue();
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(RepositoryInterface.class, String.class));
-		assertEquals(1, beanNames.length);
-		assertEquals("stringRepo", beanNames[0]);
+		assertThat(beanNames.length).isEqualTo(1);
+		assertThat(beanNames[0]).isEqualTo("stringRepo");
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(RepositoryInterface.class, String.class));
-		assertEquals(1, beanNames.length);
-		assertEquals("stringRepo", beanNames[0]);
+		assertThat(beanNames.length).isEqualTo(1);
+		assertThat(beanNames[0]).isEqualTo("stringRepo");
 
-		assertTrue(AopUtils.isJdkDynamicProxy(beanFactory.getBean("stringRepo")));
+		assertThat(AopUtils.isJdkDynamicProxy(beanFactory.getBean("stringRepo"))).isTrue();
 	}
 
 	@Test
@@ -917,17 +919,17 @@ public class ConfigurationClassPostProcessorTests {
 		beanFactory.preInstantiateSingletons();
 
 		String[] beanNames = beanFactory.getBeanNamesForType(RepositoryInterface.class);
-		assertTrue(ObjectUtils.containsElement(beanNames, "stringRepo"));
+		assertThat(ObjectUtils.containsElement(beanNames, "stringRepo")).isTrue();
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(RepositoryInterface.class, String.class));
-		assertEquals(1, beanNames.length);
-		assertEquals("stringRepo", beanNames[0]);
+		assertThat(beanNames.length).isEqualTo(1);
+		assertThat(beanNames[0]).isEqualTo("stringRepo");
 
 		beanNames = beanFactory.getBeanNamesForType(ResolvableType.forClassWithGenerics(RepositoryInterface.class, String.class));
-		assertEquals(1, beanNames.length);
-		assertEquals("stringRepo", beanNames[0]);
+		assertThat(beanNames.length).isEqualTo(1);
+		assertThat(beanNames[0]).isEqualTo("stringRepo");
 
-		assertTrue(AopUtils.isJdkDynamicProxy(beanFactory.getBean("stringRepo")));
+		assertThat(AopUtils.isJdkDynamicProxy(beanFactory.getBean("stringRepo"))).isTrue();
 	}
 
 	@Test
@@ -980,24 +982,16 @@ public class ConfigurationClassPostProcessorTests {
 		beanFactory.registerBeanDefinition("configClass1", new RootBeanDefinition(A.class));
 		beanFactory.registerBeanDefinition("configClass2", new RootBeanDefinition(AStrich.class));
 		new ConfigurationClassPostProcessor().postProcessBeanFactory(beanFactory);
-		try {
-			beanFactory.preInstantiateSingletons();
-			fail("Should have thrown BeanCreationException");
-		}
-		catch (BeanCreationException ex) {
-			assertTrue(ex.getMessage().contains("Circular reference"));
-		}
+		assertThatExceptionOfType(BeanCreationException.class).isThrownBy(
+				beanFactory::preInstantiateSingletons)
+			.withMessageContaining("Circular reference");
 	}
 
 	@Test
 	public void testCircularDependencyWithApplicationContext() {
-		try {
-			new AnnotationConfigApplicationContext(A.class, AStrich.class);
-			fail("Should have thrown BeanCreationException");
-		}
-		catch (BeanCreationException ex) {
-			assertTrue(ex.getMessage().contains("Circular reference"));
-		}
+		assertThatExceptionOfType(BeanCreationException.class).isThrownBy(() ->
+				new AnnotationConfigApplicationContext(A.class, AStrich.class))
+			.withMessageContaining("Circular reference");
 	}
 
 	@Test
@@ -1021,96 +1015,99 @@ public class ConfigurationClassPostProcessorTests {
 	@Test
 	public void testInjectionPointMatchForNarrowTargetReturnType() {
 		ApplicationContext ctx = new AnnotationConfigApplicationContext(FooBarConfiguration.class);
-		assertSame(ctx.getBean(BarImpl.class), ctx.getBean(FooImpl.class).bar);
+		assertThat(ctx.getBean(FooImpl.class).bar).isSameAs(ctx.getBean(BarImpl.class));
 	}
 
 	@Test
 	public void testVarargOnBeanMethod() {
 		ApplicationContext ctx = new AnnotationConfigApplicationContext(VarargConfiguration.class, TestBean.class);
 		VarargConfiguration bean = ctx.getBean(VarargConfiguration.class);
-		assertNotNull(bean.testBeans);
-		assertEquals(1, bean.testBeans.length);
-		assertSame(ctx.getBean(TestBean.class), bean.testBeans[0]);
+		assertThat(bean.testBeans).isNotNull();
+		assertThat(bean.testBeans.length).isEqualTo(1);
+		assertThat(bean.testBeans[0]).isSameAs(ctx.getBean(TestBean.class));
 	}
 
 	@Test
 	public void testEmptyVarargOnBeanMethod() {
 		ApplicationContext ctx = new AnnotationConfigApplicationContext(VarargConfiguration.class);
 		VarargConfiguration bean = ctx.getBean(VarargConfiguration.class);
-		assertNotNull(bean.testBeans);
-		assertEquals(0, bean.testBeans.length);
+		assertThat(bean.testBeans).isNotNull();
+		assertThat(bean.testBeans.length).isEqualTo(0);
 	}
 
 	@Test
 	public void testCollectionArgumentOnBeanMethod() {
 		ApplicationContext ctx = new AnnotationConfigApplicationContext(CollectionArgumentConfiguration.class, TestBean.class);
 		CollectionArgumentConfiguration bean = ctx.getBean(CollectionArgumentConfiguration.class);
-		assertNotNull(bean.testBeans);
-		assertEquals(1, bean.testBeans.size());
-		assertSame(ctx.getBean(TestBean.class), bean.testBeans.get(0));
+		assertThat(bean.testBeans).isNotNull();
+		assertThat(bean.testBeans.size()).isEqualTo(1);
+		assertThat(bean.testBeans.get(0)).isSameAs(ctx.getBean(TestBean.class));
 	}
 
 	@Test
 	public void testEmptyCollectionArgumentOnBeanMethod() {
 		ApplicationContext ctx = new AnnotationConfigApplicationContext(CollectionArgumentConfiguration.class);
 		CollectionArgumentConfiguration bean = ctx.getBean(CollectionArgumentConfiguration.class);
-		assertNotNull(bean.testBeans);
-		assertTrue(bean.testBeans.isEmpty());
+		assertThat(bean.testBeans).isNotNull();
+		assertThat(bean.testBeans.isEmpty()).isTrue();
 	}
 
 	@Test
 	public void testMapArgumentOnBeanMethod() {
 		ApplicationContext ctx = new AnnotationConfigApplicationContext(MapArgumentConfiguration.class, DummyRunnable.class);
 		MapArgumentConfiguration bean = ctx.getBean(MapArgumentConfiguration.class);
-		assertNotNull(bean.testBeans);
-		assertEquals(1, bean.testBeans.size());
-		assertSame(ctx.getBean(Runnable.class), bean.testBeans.values().iterator().next());
+		assertThat(bean.testBeans).isNotNull();
+		assertThat(bean.testBeans.size()).isEqualTo(1);
+		assertThat(bean.testBeans.values().iterator().next()).isSameAs(ctx.getBean(Runnable.class));
 	}
 
 	@Test
 	public void testEmptyMapArgumentOnBeanMethod() {
 		ApplicationContext ctx = new AnnotationConfigApplicationContext(MapArgumentConfiguration.class);
 		MapArgumentConfiguration bean = ctx.getBean(MapArgumentConfiguration.class);
-		assertNotNull(bean.testBeans);
-		assertTrue(bean.testBeans.isEmpty());
+		assertThat(bean.testBeans).isNotNull();
+		assertThat(bean.testBeans.isEmpty()).isTrue();
 	}
 
 	@Test
 	public void testCollectionInjectionFromSameConfigurationClass() {
 		ApplicationContext ctx = new AnnotationConfigApplicationContext(CollectionInjectionConfiguration.class);
 		CollectionInjectionConfiguration bean = ctx.getBean(CollectionInjectionConfiguration.class);
-		assertNotNull(bean.testBeans);
-		assertEquals(1, bean.testBeans.size());
-		assertSame(ctx.getBean(TestBean.class), bean.testBeans.get(0));
+		assertThat(bean.testBeans).isNotNull();
+		assertThat(bean.testBeans.size()).isEqualTo(1);
+		assertThat(bean.testBeans.get(0)).isSameAs(ctx.getBean(TestBean.class));
 	}
 
 	@Test
 	public void testMapInjectionFromSameConfigurationClass() {
 		ApplicationContext ctx = new AnnotationConfigApplicationContext(MapInjectionConfiguration.class);
 		MapInjectionConfiguration bean = ctx.getBean(MapInjectionConfiguration.class);
-		assertNotNull(bean.testBeans);
-		assertEquals(1, bean.testBeans.size());
-		assertSame(ctx.getBean(Runnable.class), bean.testBeans.get("testBean"));
+		assertThat(bean.testBeans).isNotNull();
+		assertThat(bean.testBeans.size()).isEqualTo(1);
+		assertThat(bean.testBeans.get("testBean")).isSameAs(ctx.getBean(Runnable.class));
 	}
 
 	@Test
 	public void testBeanLookupFromSameConfigurationClass() {
 		ApplicationContext ctx = new AnnotationConfigApplicationContext(BeanLookupConfiguration.class);
 		BeanLookupConfiguration bean = ctx.getBean(BeanLookupConfiguration.class);
-		assertNotNull(bean.getTestBean());
-		assertSame(ctx.getBean(TestBean.class), bean.getTestBean());
+		assertThat(bean.getTestBean()).isNotNull();
+		assertThat(bean.getTestBean()).isSameAs(ctx.getBean(TestBean.class));
 	}
 
-	@Test(expected = BeanDefinitionStoreException.class)
+	@Test
 	public void testNameClashBetweenConfigurationClassAndBean() {
-		ApplicationContext ctx = new AnnotationConfigApplicationContext(MyTestBean.class);
-		ctx.getBean("myTestBean", TestBean.class);
+		assertThatExceptionOfType(BeanDefinitionStoreException.class).isThrownBy(() -> {
+				ApplicationContext ctx = new AnnotationConfigApplicationContext(MyTestBean.class);
+				ctx.getBean("myTestBean", TestBean.class);
+		});
 	}
 
 	@Test
 	public void testBeanDefinitionRegistryPostProcessorConfig() {
 		ApplicationContext ctx = new AnnotationConfigApplicationContext(BeanDefinitionRegistryPostProcessorConfig.class);
-		assertTrue(ctx.getBean("myTestBean") instanceof TestBean);
+		boolean condition = ctx.getBean("myTestBean") instanceof TestBean;
+		assertThat(condition).isTrue();
 	}
 
 
@@ -1283,6 +1280,24 @@ public class ConfigurationClassPostProcessorTests {
 		}
 	}
 
+	@Configuration
+	static class FirstConfiguration {
+
+		@Bean
+		SyncTaskExecutor taskExecutor() {
+			return new SyncTaskExecutor();
+		}
+	}
+
+	@Configuration
+	static class SecondConfiguration {
+
+		@Bean(name = {"applicationTaskExecutor", "taskExecutor"})
+		SimpleAsyncTaskExecutor simpleAsyncTaskExecutor() {
+			return new SimpleAsyncTaskExecutor();
+		}
+	}
+
 	public static class ScopedProxyConsumer {
 
 		@Autowired
@@ -1300,6 +1315,7 @@ public class ConfigurationClassPostProcessorTests {
 
 	public interface RepositoryInterface<T> {
 
+		@Override
 		String toString();
 	}
 
@@ -1373,6 +1389,7 @@ public class ConfigurationClassPostProcessorTests {
 	@Configuration
 	public static class RawFactoryMethodRepositoryConfiguration {
 
+		@SuppressWarnings("rawtypes") // intentionally a raw type
 		@Bean
 		public Repository stringRepo() {
 			return new Repository<String>() {
@@ -1931,8 +1948,8 @@ public class ConfigurationClassPostProcessorTests {
 				@Qualifier("systemProperties") Map<String, String> sysprops,
 				@Qualifier("systemEnvironment") Map<String, String> sysenv) {
 			this.testBeans = testBeans;
-			assertSame(env.getSystemProperties(), sysprops);
-			assertSame(env.getSystemEnvironment(), sysenv);
+			assertThat(sysprops).isSameAs(env.getSystemProperties());
+			assertThat(sysenv).isSameAs(env.getSystemEnvironment());
 			return () -> {};
 		}
 

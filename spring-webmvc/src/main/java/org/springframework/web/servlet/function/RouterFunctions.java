@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import org.apache.commons.logging.LogFactory;
 
 import org.springframework.core.io.Resource;
 import org.springframework.util.Assert;
+import org.springframework.web.util.pattern.PathPatternParser;
 
 /**
  * <strong>Central entry point to Spring's functional web framework.</strong>
@@ -143,10 +144,10 @@ public abstract class RouterFunctions {
 	 * The returned function can be {@linkplain Function#andThen(Function) composed} on, for
 	 * instance to return a default resource when the lookup function does not match:
 	 * <pre class="code">
-	 * Mono&lt;Resource&gt; defaultResource = Mono.just(new ClassPathResource("index.html"));
-	 * Function&lt;ServerRequest, Mono&lt;Resource&gt;&gt; lookupFunction =
+	 * Optional&lt;Resource&gt; defaultResource = Optional.of(new ClassPathResource("index.html"));
+	 * Function&lt;ServerRequest, Optional&lt;Resource&gt;&gt; lookupFunction =
 	 *   RouterFunctions.resourceLookupFunction("/resources/**", new FileSystemResource("public-resources/"))
-	 *     .andThen(resourceMono -&gt; resourceMono.switchIfEmpty(defaultResource));
+	 *     .andThen(resource -&gt; resource.or(() -&gt; defaultResource));
 	 * RouterFunction&lt;ServerResponse&gt; resources = RouterFunctions.resources(lookupFunction);
      * </pre>
 	 * @param pattern the pattern to match
@@ -168,9 +169,24 @@ public abstract class RouterFunctions {
 		return new ResourcesRouterFunction(lookupFunction);
 	}
 
-	@SuppressWarnings("unchecked")
-	static <T extends ServerResponse> HandlerFunction<T> cast(HandlerFunction<?> handlerFunction) {
-		return (HandlerFunction<T>) handlerFunction;
+	/**
+	 * Changes the {@link PathPatternParser} on the given {@linkplain RouterFunction router function}. This method
+	 * can be used to change the {@code PathPatternParser} properties from the defaults, for instance to change
+	 * {@linkplain PathPatternParser#setCaseSensitive(boolean) case sensitivity}.
+	 * @param routerFunction the router function to change the parser in
+	 * @param parser the parser to change to.
+	 * @param <T> the type of response returned by the handler function
+	 * @return the change router function
+	 */
+	public static <T extends ServerResponse> RouterFunction<T> changeParser(RouterFunction<T> routerFunction,
+			PathPatternParser parser) {
+
+		Assert.notNull(routerFunction, "RouterFunction must not be null");
+		Assert.notNull(parser, "Parser must not be null");
+
+		ChangePathPatternParserVisitor visitor = new ChangePathPatternParserVisitor(parser);
+		routerFunction.accept(visitor);
+		return routerFunction;
 	}
 
 
@@ -348,6 +364,17 @@ public abstract class RouterFunctions {
 		 * @return this builder
 		 */
 		Builder OPTIONS(String pattern, HandlerFunction<ServerResponse> handlerFunction);
+
+		/**
+		 * Adds a route to the given handler function that handles all requests that match the
+		 * given predicate.
+		 *
+		 * @param predicate the request predicate to match
+		 * @param handlerFunction the handler function to handle all requests that match the predicate
+		 * @return this builder
+		 * @see RequestPredicates
+		 */
+		Builder route(RequestPredicate predicate, HandlerFunction<ServerResponse> handlerFunction);
 
 		/**
 		 * Adds a route to the given handler function that handles all HTTP {@code OPTIONS} requests
@@ -611,6 +638,8 @@ public abstract class RouterFunctions {
 		 */
 		RouterFunction<ServerResponse> build();
 	}
+
+
 	/**
 	 * Receives notifications from the logical structure of router functions.
 	 */
@@ -654,7 +683,7 @@ public abstract class RouterFunctions {
 	}
 
 
-	private abstract static class AbstractRouterFunction<T extends ServerResponse> implements RouterFunction<T> {
+	abstract static class AbstractRouterFunction<T extends ServerResponse> implements RouterFunction<T> {
 
 		@Override
 		public String toString() {
@@ -663,6 +692,7 @@ public abstract class RouterFunctions {
 			return visitor.toString();
 		}
 	}
+
 
 	/**
 	 * A composed routing function that first invokes one function, and then invokes the
@@ -698,6 +728,7 @@ public abstract class RouterFunctions {
 			this.second.accept(visitor);
 		}
 	}
+
 
 	/**
 	 * A composed routing function that first invokes one function, and then invokes
@@ -772,8 +803,8 @@ public abstract class RouterFunctions {
 		}
 	}
 
-	private static final class DefaultRouterFunction<T extends ServerResponse>
-			extends AbstractRouterFunction<T> {
+
+	private static final class DefaultRouterFunction<T extends ServerResponse> extends AbstractRouterFunction<T> {
 
 		private final RequestPredicate predicate;
 
@@ -806,8 +837,8 @@ public abstract class RouterFunctions {
 
 	}
 
-	private static final class DefaultNestedRouterFunction<T extends ServerResponse>
-			extends AbstractRouterFunction<T> {
+
+	private static final class DefaultNestedRouterFunction<T extends ServerResponse> extends AbstractRouterFunction<T> {
 
 		private final RequestPredicate predicate;
 
@@ -851,6 +882,7 @@ public abstract class RouterFunctions {
 		}
 
 	}
+
 
 	private static class ResourcesRouterFunction extends  AbstractRouterFunction<ServerResponse> {
 
